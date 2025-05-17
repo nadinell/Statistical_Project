@@ -1,0 +1,677 @@
+---
+title: "Heart_Disease"
+output: html_document
+date: "2023-12-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# ~***`Projet Statistique : Heart Disease`***~ {style="color:#4682B4"}
+
+## ^**Exploration des données :**^ {style="color: #4682B4"}
+
+-   [Importation :]{.underline}
+
+```{r}
+data <- read.csv(file=file.choose(),sep=";", header=TRUE)
+attach(data)
+
+head(data, 10)
+```
+
+-   [Dimension de le data frame :]{.underline}
+
+```{r}
+dimension <- dim(data)
+
+print(dimension)
+
+```
+
+```{r}
+str(data)
+```
+
+```{r}
+summary(data)
+```
+
+[Les valeurs uniques :]{.underline}
+
+```{r}
+for (col in names(data)) {
+  cat("Variable:", col, "\n")
+  cat(unique(data[[col]]), "\n\n")
+}
+```
+
+## \* Partie 1 : Préparation et Exploration des Données\* {style="color:blue"}
+
+### [1.Traitement des données :]{.underline} {style="color:#00BFFF"}
+
+-   [Améliorer la qualité des données]{.underline}
+
+    [**1.Les duplications**]{.underline}
+
+```{r}
+# Identifier les doublons
+doublons <- data[duplicated(data), ]
+
+# Afficher les doublons
+print(doublons)
+
+
+```
+
+=\> Suppression des duplications :
+
+```{r}
+data <- unique(data)
+```
+
+### [2.Détection des outliers :]{.underline} {style="color:#00BFFF"}
+
+```{r}
+# Visualisation des données aberrantes pour chaque variable quantitative
+par(mfrow = c(2, 2))  
+
+for (i in 1:ncol(data)) {
+  if (is.numeric(data[, i])) {
+    boxplot(data[, i], outline = TRUE, main = names(data)[i])
+    
+    # Identifie les valeurs aberrantes
+    outliers <- boxplot.stats(data[, i])$out
+    cat("Colonnes:", names(data)[i], "\n")
+    cat("Valeurs aberrantes:", outliers, "\n")
+    cat("Nombre de valeurs aberrantes:", length(outliers), "\n\n")
+  }
+}
+
+```
+
+*=\> Traitement des outliers par la median :*
+
+-   L'age 86 ne peut pas etre considéré comme outliers
+
+```{r}
+#  Variable : TensionArterielleRepos7
+outlier_tension <- which(data$TensionArterielleRepos > 240)  
+
+# Treat the outlier using mean imputation
+data$TensionArterielleRepos[outlier_tension] <- median(data$TensionArterielleRepos, na.rm = TRUE)
+summary(data$TensionArterielleRepos)
+
+```
+
+```{r}
+# Identify rows with cholesterol less than 85 or greater than 240
+outlier_cholesterol <- which(data$Cholesterol < 85 | data$Cholesterol > 240)
+
+# Treat the outliers using mean imputation
+data$Cholesterol[outlier_cholesterol] <- median(data$Cholesterol, na.rm = TRUE)
+
+summary(data$Cholesterol)
+```
+
+```{r}
+# FrequenceCardiaqueMax 
+outlier_FrequenceCard <- which(data$FrequenceCardiaqueMax < 60 |data$FrequenceCardiaqueMax > 202)  # Set a threshold for illustration (adjust as needed)
+
+# Treat the outlier using mean imputation
+data$FrequenceCardiaqueMax[outlier_FrequenceCard] <- median(data$FrequenceCardiaqueMax, na.rm = TRUE)
+summary(data$FrequenceCardiaqueMax)
+```
+
+#### [3.Détection des valeurs manquantes :]{.underline} {style="color:#00BFFF"}
+
+-   Check for NA values in the DataFrame
+
+```{r}
+
+nan_values <- colSums(is.na(data))
+
+# Display the count of NA values for each column
+
+missing_values <- apply(data, 2, function(col) sum(is.na(col) | col == "" | sapply(col, nchar) == 0))
+
+# Display the count of missing values for each column
+cat("Count of missing values (NA and empty strings) in each column:\n")
+
+print(missing_values)
+```
+
+```{r}
+
+# Calculate the percentage of missing values in each column
+total_rows <- nrow(data)
+percentage_missing <- (missing_values / total_rows) * 100
+
+# Display the percentage of missing values for each column
+cat("\nPercentage of missing values in each column:\n",percentage_missing)
+
+print(percentage_missing)
+
+```
+
+**Impute missing values :**
+
+-   Variables numériques par median
+
+```{r}
+#  "Age" column 
+data$Age[is.na(data$Age)] <- median(data$Age, na.rm = TRUE)
+# "TensionArterielleRepos" column   
+data$TensionArterielleRepos[is.na(data$TensionArterielleRepos)] <- median(data$TensionArterielleRepos, na.rm = TRUE)
+
+
+data$FrequenceCardiaqueMax[is.na(data$FrequenceCardiaqueMax)] <- median(data$FrequenceCardiaqueMax, na.rm = TRUE)
+
+
+data$Cholesterol[is.na(data$Cholesterol)] <- median(data$Cholesterol , na.rm = TRUE)
+
+data$GlycemieJeune[is.na(data$GlycemieJeune)] <- median(data$GlycemieJeune, na.rm = TRUE)
+
+data$DepressionAncienne[is.na(data$DepressionAncienne )] <- median(data$DepressionAncienne  , na.rm = TRUE)
+
+
+```
+
+-   Variables catégoriques par la valeur la plus fréquente :
+
+```{r}
+
+categorical_cols <- c("PenteSTExercice", "AngineExercice", "TypeDouleurThoracique", "Sexe","ECGRepos","MaladieCardiaque","AngineExercice")
+
+# Loop through categorical columns
+for (col in categorical_cols) {
+  # Identify the current column
+  current_col <- data[[col]]
+  
+  # Count the occurrences of each value
+  col_counts <- table(current_col)
+  
+  # Find the most frequent value
+  mode_value <- names(col_counts)[which.max(col_counts)]
+  
+  # Print the most frequent value for each column
+  cat("Most frequent value in", col, ":", mode_value, "\n")
+}
+
+```
+
+```{r}
+#data[[ECGRepos]][data[[ECGRepos]] == ""] <- "Normal"
+data$TypeDouleurThoracique[data$TypeDouleurThoracique==""] <- mode(data$TypeDouleurThoracique)
+data$Sexe[data$Sexe==""] <- mode(data$Sexe)
+data$ECGRepos[data$ECGRepos==""] <- mode(data$ECGRepos)
+data$PenteSTExercice[data$PenteSTExercice==""] <- mode(data$PenteSTExercice)
+
+#maladie cardiaque to impute
+# Calculate the mode
+mode_value <- as.numeric(names(sort(table(data$MaladieCardiaque), decreasing = TRUE)[1]))
+
+# Replace missing values with the mode
+data$MaladieCardiaque[is.na(data$MaladieCardiaque)] <- mode_value 
+
+data$AngineExercice [data$AngineExercice ==""] <-mode(data$AngineExercice )
+dataI=data
+```
+
+#### 4.[Encodage]{.underline} : {style="color:#00BFFF"}
+
+```{r}
+str(data)
+
+```
+
+*Transformer le type statistique chr en factor :*
+
+```{r}
+data$Sexe <- as.factor(data$Sexe)
+data$TypeDouleurThoracique <- as.factor(data$TypeDouleurThoracique)
+data$ECGRepos <- as.factor(data$ECGRepos)
+data$AngineExercice <- as.factor(data$AngineExercice)
+data$PenteSTExercice <- as.factor(data$PenteSTExercice)
+```
+
+*Use label encoding :*
+
+```{r}
+data$Sexe <- as.numeric(data$Sexe)
+data$TypeDouleurThoracique <- as.numeric(data$TypeDouleurThoracique)
+data$ECGRepos <- as.numeric(data$ECGRepos)
+data$AngineExercice <- as.numeric(data$AngineExercice)
+data$PenteSTExercice <- as.numeric(data$PenteSTExercice)
+
+head(data,5)
+```
+
+```{r}
+str(data)
+```
+
+#### [5.Standardisation :]{.underline} {style="color:#00BFFF"}
+
+```{r}
+###
+Y<-data[,ncol(data)]
+data1<-data[, -ncol(data)]
+data1= scale(data1)
+data<- as.data.frame(data1)
+data$MaladieCardiaque <- Y
+data<- as.data.frame(data)
+
+```
+
+```{r}
+head(data,5)
+```
+
+## [2.Analyse Univarié]{.underline} {style="color: blue"}
+
+```{r}
+# List of quantitative columns
+quantitative_cols <- c("Age", "TensionArterielleRepos", "Cholesterol", "DepressionAncienne", "FrequenceCardiaqueMax")
+
+# Loop through each quantitative column
+for (col in quantitative_cols) {
+  # Check if the column is numeric
+  if (is.numeric(dataI[[col]])) {
+    # Print a message indicating the start of univariate analysis for the current column
+    cat("\nRésumé statistique pour", col, ":\n")
+    
+    # Display summary statistics for the numeric column
+    print(summary(dataI[[col]]))
+
+    # Create a histogram for the numeric column
+    hist(dataI[[col]], main = paste("Histogramme de", col), xlab = col, col = "lightblue")
+  } else {
+    # If the column is not numeric, print a message indicating that the column is not quantitative
+    cat("\nLa variable", col, "n'est pas quantitative.\n")
+  }
+}
+
+```
+
+```{r}
+
+
+# Assuming your data frame is called 'data'
+# List of columns for which you want to create pie charts
+columns_to_visualize <- c("Sexe", "TypeDouleurThoracique", "ECGRepos", "AngineExercice", "PenteSTExercice")
+
+# Loop through each column and create a pie chart
+for (col in columns_to_visualize) {
+  col_factor <- factor(dataI[[col]])  # Ensure the column is treated as a factor
+  col_pie <- table(col_factor)
+  
+  # Create pie chart
+  pie(col_pie, labels = paste(names(col_pie), "(", col_pie, ")", sep = ""), main = paste(col, "Distribution"))
+}
+
+
+```
+
+## 3.Analyse Bivariée {style="color:blue"}
+
+## Relation qualitative-qualitative {style="color : #B0E0E6"}
+
+```{r}
+
+variables_qualitative=c(dataI$Sexe,dataI$TypeDouleurThoracique,dataI$GlycemieJeune,dataI$ECGRepos, dataI$AngineExercice,dataI$PenteSTExercice)
+
+```
+
+```{r}
+# Create a contingency table
+cont <- table(dataI$MaladieCardiaque, dataI$ECGRepos)
+
+# Specify colors for the mosaic plot
+# You can customize the colors as needed
+colors <- c("lightblue", "lightcoral", "lightgreen", "lightpink")
+
+# Create the mosaic plot with colors
+mosaicplot(cont, color = colors, main = "Mosaic Plot of MaladieCardiaque and ECGRepos")
+
+```
+
+```{r}
+
+chisq.test(cont)
+#p-valus>0,05 on accepte l'hypothése d'independance
+#il n'existe pas un lien entre la var sexe et la var qualif
+```
+
+## Relation qualitative-quantitative {style="color: #B0E0E6"}
+
+-   Fréquence et Cardiaque :
+
+```{r}
+boxplot(FrequenceCardiaqueMax ~ MaladieCardiaque, data = dataI,
+        main = "Boxplot of FrequenceCardiaqueMax by MaladieCardiaque",
+        xlab = "MaladieCardiaque", ylab = "FrequenceCardiaqueMax")
+
+```
+
+```{r}
+cat("Shapiro-Wilk test for FrequenceCardiaqueMax :\n")
+tapply(FrequenceCardiaqueMax,MaladieCardiaque,shapiro.test)
+
+
+```
+
+```{r}
+wilcox_frequency <- wilcox.test(FrequenceCardiaqueMax ~ MaladieCardiaque)
+cat("Wilcoxon-Mann-Whitney test for FrequenceCardiaqueMax and MaladieCardiaque:\n")
+print(wilcox_frequency)
+
+```
+
+Age
+
+```{r}
+boxplot(Age ~ MaladieCardiaque, data = dataI,
+        main = "Boxplot of Age by MaladieCardiaque",
+        xlab = "MaladieCardiaque", ylab = "Age")
+```
+
+```{r}
+cat("Shapiro-Wilk test for Age \n")
+tapply(Age,MaladieCardiaque,shapiro.test)
+
+```
+
+```{r}
+# Print the Wilcoxon-Mann-Whitney test results
+
+cat("Wilcoxon-Mann-Whitney test for Age and MaladieCardiaque:\n")
+wilcox_age <- wilcox.test(Age ~ MaladieCardiaque)
+print(wilcox_age )
+
+
+```
+
+Interprete
+
+TensionArterielleRepos
+
+```{r}
+boxplot(TensionArterielleRepos ~ MaladieCardiaque, data = dataI,
+        main = "Boxplot of TensionArterielleRepos by MaladieCardiaque",
+        xlab = "MaladieCardiaque", ylab = "TensionArterielleRepos")
+```
+
+```{r}
+cat("Shapiro-Wilk test for TensionArterielleRepos :\n")
+tapply(TensionArterielleRepos,MaladieCardiaque,shapiro.test)
+```
+
+```{r}
+wilcox_tension <- wilcox.test(TensionArterielleRepos~ MaladieCardiaque)
+cat("Wilcoxon-Mann-Whitney test for TensionArterielleRepos and MaladieCardiaque:\n")
+print(wilcox_tension)
+
+```
+
+Interprete
+
+Cholesterol
+
+```{r}
+boxplot(Cholesterol ~ MaladieCardiaque, data = dataI,
+        main = "Boxplot of Cholesterol by MaladieCardiaque",
+        xlab = "MaladieCardiaque", ylab = "Cholesterol")
+```
+
+```{r}
+cat("Shapiro-Wilk test for Cholesterol :\n")
+tapply(Cholesterol,MaladieCardiaque,shapiro.test)
+
+```
+
+```{r}
+
+cat("Wilcoxon-Mann-Whitney test for Cholesterol and MaladieCardiaque:\n")
+
+wilcox_cholesterol <- wilcox.test(Cholesterol~ MaladieCardiaque)
+print(wilcox_cholesterol)
+```
+
+DepressionAncienne
+
+```{r}
+boxplot(DepressionAncienne ~ MaladieCardiaque, data = dataI,
+        main = "Boxplot of DepressionAncienne by MaladieCardiaque",
+        xlab = "MaladieCardiaque", ylab = "DepressionAncienne")
+```
+
+```{r}
+cat("Shapiro-Wilk test for DepressionAncienne (rows 500 to 1000):\n")
+
+tapply(DepressionAncienne,MaladieCardiaque,shapiro.test)
+
+
+```
+
+```{r}
+wilcox_depr <- wilcox.test(DepressionAncienne ~ MaladieCardiaque)
+cat("Wilcoxon-Mann-Whitney test for DepressionAncienne and MaladieCardiaque:\n")
+print(wilcox_depr)
+
+```
+
+## Relation quantitative_quantitative {style="color :#B0E0E6"}
+
+```{r}
+
+numerical_variables <- c("Age", "TensionArterielleRepos", "Cholesterol", "FrequenceCardiaqueMax","DepressionAncienne")
+
+for (var in numerical_variables) {
+  correlation <- cor.test(data[[var]], dataI$Cholesterol, method = "spearman")
+  print(paste("spearman correlation test for", var, "and Cholesterol:"))
+  print(correlation)
+}
+```
+
+## 5.Régression linéaire {style="color: #6495ED"}
+
+### \* Régression linéaire Simple {style="color: #ADD8E6"}
+
+```{r}
+plot(x = data$Cholesterol  , y=data$FrequenceCardiaqueMax)
+
+```
+
+```{r}
+print("Cholesterol frequenceCardiaqueMax")
+model_simple <- lm(data$Cholesterol ~ data$FrequenceCardiaqueMax, data = data)
+summary(model_simple)
+Resid_n=residuals(model_simple)
+hist(Resid_n)
+shapiro.test(Resid_n)
+par(mfrow=c(2,2))
+plot(model_simple)
+```
+
+```{r}
+plot(x = data$Cholesterol   , data$TensionArterielleRepos)
+
+```
+
+```{r}
+print("Cholesterol tension")
+model_simple <- lm(data$Cholesterol ~ data$TensionArterielleRepos, data = data)
+summary(model_simple)
+Resid_n=residuals(model_simple)
+hist(Resid_n)
+shapiro.test(Resid_n)
+par(mfrow=c(2,2))
+plot(model_simple)
+```
+
+### \* Régression linéaire Multiple {style="color: #ADD8E6"}
+
+```{r}
+data <- as.data.frame(data)
+# Fit du modèle de régression linéaire simple
+model <- lm(Cholesterol ~ TensionArterielleRepos + FrequenceCardiaqueMax, data = data)
+
+# Extraction des résidus
+residuals <- residuals(model)
+
+# Test de Shapiro-Wilk pour la normalité
+shapiro_test <- shapiro.test(residuals)
+print(shapiro_test)
+
+# Test de Kolmogorov-Smirnov pour la normalité
+ks_test <- ks.test(residuals, "pnorm")
+print(ks_test)
+
+
+```
+
+```{r}
+#plot(Cholesterol~.,data=data)
+# Fit du modèle de régression linéaire simple
+model <- lm(Cholesterol ~., data = data)
+
+# Extraction des résidus
+residuals <- residuals(model)
+
+# Test de Shapiro-Wilk pour la normalité
+shapiro_test <- shapiro.test(residuals)
+print(shapiro_test)
+
+# Test de Kolmogorov-Smirnov pour la normalité
+ks_test <- ks.test(residuals, "pnorm")
+print(ks_test)
+```
+
+## [*Partie 2 : Analyse Multivariée :*]{.underline} {style="color:blue"}
+
+### 1.Analyse de variance (ANOVA) : {style="color:pink"}
+
+On va tester la normalité
+
+```{r}
+
+# Assuming your data frame is called 'your_data'
+quantitative_cols <- c("Age", "TensionArterielleRepos", "Cholesterol", "DepressionAncienne","FrequenceCardiaqueMax")
+categorical_cols <- c("PenteSTExercice", "AngineExercice", "TypeDouleurThoracique", "Sexe", "ECGRepos", "MaladieCardiaque", "GlycemieJeune")
+
+# Loop through each qualitative variable
+for (cat_col in categorical_cols) {
+  # Create a list to store tables for each quantitative variable
+  tables_list <- list()
+  
+  # Loop through each quantitative variable
+  for (quant_col in quantitative_cols) {
+    # Create an empty data frame to store results for the current quantitative variable
+    results_df <- data.frame(
+      Variable = character(),
+      Group = character(),
+      p_value = numeric(),
+      stringsAsFactors = FALSE
+    )
+    
+    # Perform Shapiro-Wilk test within each group
+    shapiro_results <- tapply(dataI[[quant_col]], dataI[[cat_col]], function(x) shapiro.test(x)$p.value)
+    
+    # Extract results and append to the results data frame
+    for (group_name in names(shapiro_results)) {
+      p_value <- shapiro_results[[group_name]]
+      results_df <- rbind(results_df, data.frame(
+        Variable = quant_col,
+        Group = group_name,
+        p_value = p_value
+      ))
+    }
+    
+    # Store the table for the current quantitative variable in the list
+    tables_list[[quant_col]] <- results_df
+  }
+  
+  # Print tables for the current qualitative variable
+  cat(sprintf("Tables for variable: %s\n", cat_col))
+  for (quant_col in quantitative_cols) {
+    cat(sprintf("Results for %s\n", quant_col))
+    print(tables_list[[quant_col]])
+    cat("\n")
+  }
+}
+
+```
+
+```{r}
+dim(data)
+```
+
+```{r}
+# Assuming your data frame is called 'your_data'
+quantitative_cols <- c("Age", "TensionArterielleRepos", "Cholesterol", "DepressionAncienne", "FrequenceCardiaqueMax")
+categorical_cols <- c("PenteSTExercice", "AngineExercice", "TypeDouleurThoracique", "Sexe", "ECGRepos", "MaladieCardiaque", "GlycemieJeune")
+
+# Loop through each quantitative variable
+for (quant_col in quantitative_cols) {
+  # Loop through each categorical variable
+  for (cat_col in categorical_cols) {
+    # Create a formula for the Kruskal-Wallis test
+    formula <- as.formula(paste(quant_col, "~", cat_col))
+    
+    # Perform Kruskal-Wallis test
+    kruskal_result <- kruskal.test(formula, data = data)
+    
+    # Print results when p-value is more than 0.05
+    if (kruskal_result$p.value > 0.05) {
+      cat(sprintf("Kruskal-Wallis test for %s and %s:\n", quant_col, cat_col))
+      print(kruskal_result)
+      cat("\n")
+    }
+  }
+}
+
+
+```
+
+### 2.Regression logistique : {style="color:pink"}
+
+```{r}
+log_model <- glm(Y ~   Sexe + TypeDouleurThoracique +  GlycemieJeune + FrequenceCardiaqueMax + AngineExercice + DepressionAncienne + PenteSTExercice, data = data, family = binomial)
+summary(log_model)
+```
+
+## [*Partie 3 : Modelisation avancée*]{.underline} {style="color:blue"}
+
+#### [Analyse discriminante linéaire (ADL)]{.smallcaps}
+
+```{r}
+library(MASS)
+```
+
+```{r}
+linear <- lda(MaladieCardiaque~.,data)
+```
+
+```{r}
+linear
+```
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
